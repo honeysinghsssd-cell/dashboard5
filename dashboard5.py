@@ -301,13 +301,4 @@ import time
 
 # Run Streamlit in the background
 # Streamlit usually runs on port 8501
-process = subprocess.Popen(["streamlit", "run", "app.py", "--server.port", "8501", "--server.enableCORS", "false", "--browser.gatherUsageStats", "false"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-# Wait a moment for Streamlit to start
-time.sleep(5)
-
-# Open a ngrok tunnel to the Streamlit port
-tunnel = ngrok.connect(8501)
-
-# Print the ngrok public URL
-print(f"Streamlit App URL: {tunnel.public_url}")
