@@ -264,7 +264,7 @@ print("Please upload the 'ai_job_dataset copy.csv' file:")
 uploaded = files.upload()
 
 # Install pyngrok to interact with ngrok
-!pip install pyngrok
+
 
 """#### Set your ngrok authentication token
 
