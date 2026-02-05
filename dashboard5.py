@@ -259,30 +259,250 @@ import pandas as pd
 
 
 
+%%writefile app.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.figure_factory as ff
+import plotly.graph_objects as go
+from collections import Counter
 
-# --- APP CONFIGURATION ---
-st.set_page_config(page_title="AI Job Dashboard", layout="wide")
+# -----------------------------------------------------------------------------
+# 1. Page Configuration & Data Loading
+# -----------------------------------------------------------------------------
+st.set_page_config(page_title="AI Job Market Dashboard", layout="wide")
 
-# --- DATA LOADING ---
-st.title("🐍 AI Job Market Insights")
+st.title("AI Job Market 360° Dashboard")
+st.markdown("""
+This interactive dashboard provides a comprehensive view of the AI job market, 
+combining general exploratory analysis with deep-dive trends and diverse visualization techniques.
+""")
 
-# Use Streamlit's native file uploader instead of google.colab
-uploaded_file = st.file_uploader("Upload your 'ai_job_dataset copy.csv' file", type=["csv"])
+@st.cache_data
+def load_data():
+    # Load dataset (ensure the file is in the same directory)
+    try:
+        df = pd.read_csv('ai_job_dataset copy.csv')
+        # Convert date columns
+        df['posting_date'] = pd.to_datetime(df['posting_date'])
+        df['application_deadline'] = pd.to_datetime(df['application_deadline'])
+        return df
+    except FileNotFoundError:
+        return None
 
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+df = load_data()
+
+if df is None:
+    st.error("Error: 'ai_job_dataset copy.csv' not found. Please upload the file to the same directory.")
+    st.stop()
+
+# -----------------------------------------------------------------------------
+# 2. Sidebar Filters
+# -----------------------------------------------------------------------------
+st.sidebar.header("Filter Data")
+
+# Filter by Industry
+all_industries = sorted(df['industry'].unique())
+selected_industry = st.sidebar.multiselect("Select Industry", all_industries, default=all_industries[:5])
+
+# Filter by Experience Level
+all_levels = df['experience_level'].unique()
+selected_exp_level = st.sidebar.multiselect("Select Experience Level", all_levels, default=all_levels)
+
+# Apply Filters
+if not selected_industry:
+    selected_industry = all_industries
+if not selected_exp_level:
+    selected_exp_level = all_levels
+
+filtered_df = df[
+    (df['industry'].isin(selected_industry)) &
+    (df['experience_level'].isin(selected_exp_level))
+]
+
+st.sidebar.markdown("---")
+st.sidebar.info(f"Showing {len(filtered_df)} jobs based on filters.")
+
+# -----------------------------------------------------------------------------
+# 3. Main Dashboard Layout (Tabs)
+# -----------------------------------------------------------------------------
+# Create 5 main tabs
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Overview & Summary", 
+    "Exploratory Analysis", 
+    "Multivariate Analysis",
+    "Trend Deep-Dive",
+    "Distinct Plot Types"
+])
+
+# --- TAB 1: OVERVIEW & SUMMARY ---
+with tab1:
+    st.header("Snapshot of the AI Job Market")
     
-    # --- YOUR DASHBOARD LOGIC START ---
-    st.write("### Data Preview", df.head())
+    # KPI Metrics
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Jobs", len(filtered_df))
+    c2.metric("Avg Salary (USD)", f"${filtered_df['salary_usd'].mean():,.0f}")
+    c3.metric("Avg Experience", f"{filtered_df['years_experience'].mean():.1f} Years")
+    c4.metric("Avg Benefits Score", f"{filtered_df['benefits_score'].mean():.1f}/10")
     
-    # Example Chart
-    if 'job_title' in df.columns:
-        fig = px.bar(df['job_title'].value_counts().head(10), title="Top 10 Job Titles")
-        st.plotly_chart(fig)
-    # --- YOUR DASHBOARD LOGIC END ---
+    st.divider()
     
-else:
-    st.info("Please upload a CSV file to see the dashboard.")
+    # Quick Data Preview
+    st.subheader("Data Preview")
+    st.dataframe(filtered_df.head(10), use_container_width=True)
+    
+    # Statistical Summary
+    with st.expander("View Statistical Summary"):
+        st.write(filtered_df.describe())
+
+# --- TAB 2: EXPLORATORY ANALYSIS (Univariate & Bivariate) ---
+with tab2:
+    st.header("Exploratory Data Analysis")
+    
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.subheader("Distribution Analysis (Univariate)")
+        uni_col = st.selectbox("Select Column for Distribution", ['salary_usd', 'years_experience', 'benefits_score', 'remote_ratio'])
+        fig_hist = px.histogram(filtered_df, x=uni_col, marginal="box", title=f"Distribution of {uni_col}", color_discrete_sequence=['#636EFA'])
+        st.plotly_chart(fig_hist, use_container_width=True)
+        
+    with col_b:
+        st.subheader("Relationship Analysis (Bivariate)")
+        x_axis = st.selectbox("X-Axis", ['years_experience', 'benefits_score', 'company_size'], index=0)
+        y_axis = st.selectbox("Y-Axis", ['salary_usd', 'job_description_length'], index=0)
+        
+        if filtered_df[x_axis].dtype == 'object':
+            fig_bi = px.box(filtered_df, x=x_axis, y=y_axis, color=x_axis, title=f"{y_axis} by {x_axis}")
+        else:
+            fig_bi = px.scatter(filtered_df, x=x_axis, y=y_axis, color='experience_level', title=f"{y_axis} vs {x_axis}", opacity=0.6)
+            
+        st.plotly_chart(fig_bi, use_container_width=True)
+
+# --- TAB 3: MULTIVARIATE ANALYSIS ---
+with tab3:
+    st.header("Multivariate Analysis")
+    
+    # 1. Correlation Heatmap
+    st.subheader("Correlation Matrix")
+    numeric_df = filtered_df.select_dtypes(include=['float64', 'int64'])
+    corr = numeric_df.corr()
+    fig_corr = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', origin='lower', title="Correlation Heatmap")
+    st.plotly_chart(fig_corr, use_container_width=True)
+    
+    # 2. 3D Scatter Plot
+    st.subheader("3D Exploration: Salary, Experience & Benefits")
+    fig_3d = px.scatter_3d(filtered_df, x='years_experience', y='benefits_score', z='salary_usd',
+                           color='company_size', size='remote_ratio', size_max=18, opacity=0.7,
+                           title="3D: Salary (Z) vs Experience (X) vs Benefits (Y)")
+    fig_3d.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    st.plotly_chart(fig_3d, use_container_width=True)
+
+# --- TAB 4: TREND DEEP-DIVE (5 Specific Trends) ---
+with tab4:
+    st.header("Market Trends & Insights")
+    
+    row1_1, row1_2 = st.columns(2)
+    
+    # Trend 1: Top Paying Roles
+    with row1_1:
+        st.subheader("1. Top 10 Highest Paying Roles")
+        top_paying = filtered_df.groupby('job_title')['salary_usd'].median().sort_values(ascending=False).head(10).reset_index()
+        fig_roles = px.bar(top_paying, x='salary_usd', y='job_title', orientation='h', 
+                           title="Median Salary by Job Title", color='salary_usd', color_continuous_scale='Viridis')
+        st.plotly_chart(fig_roles, use_container_width=True)
+
+    # Trend 2: Location Hotspots
+    with row1_2:
+        st.subheader("2. Top Locations by Demand")
+        top_locs = filtered_df['company_location'].value_counts().head(10).reset_index()
+        top_locs.columns = ['Location', 'Count']
+        fig_loc = px.bar(top_locs, x='Count', y='Location', orientation='h', 
+                         title="Number of Jobs per Country", color='Count')
+        fig_loc.update_layout(yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_loc, use_container_width=True)
+        
+    row2_1, row2_2 = st.columns(2)
+    
+    # Trend 3: Remote Work Impact
+    with row2_1:
+        st.subheader("3. Does Remote Work Affect Salary?")
+        # Group remote ratio for cleaner plotting if needed, or use raw
+        fig_remote = px.box(filtered_df, x='remote_ratio', y='salary_usd', 
+                            title="Salary Distribution by Remote Ratio", color='remote_ratio')
+        st.plotly_chart(fig_remote, use_container_width=True)
+        
+    # Trend 4: Skills Analysis
+    with row2_2:
+        st.subheader("4. Top In-Demand Skills")
+        # Flatten skills list
+        all_skills = []
+        for skills_str in filtered_df['required_skills'].dropna():
+            if isinstance(skills_str, str):
+                all_skills.extend([s.strip() for s in skills_str.split(',')])
+        
+        if all_skills:
+            skill_counts = pd.DataFrame(Counter(all_skills).most_common(10), columns=['Skill', 'Count'])
+            fig_skills = px.bar(skill_counts, x='Count', y='Skill', orientation='h', 
+                                title="Most Requested Skills", color='Count', color_continuous_scale='Magma')
+            fig_skills.update_layout(yaxis={'categoryorder':'total ascending'})
+            st.plotly_chart(fig_skills, use_container_width=True)
+        else:
+            st.write("No skill data available.")
+
+    # Trend 5: Education Premium
+    st.subheader("5. Education vs. Salary")
+    fig_edu = px.violin(filtered_df, x='education_required', y='salary_usd', box=True, points=False,
+                        title="Salary Distribution by Education Level", color='education_required')
+    st.plotly_chart(fig_edu, use_container_width=True)
+
+# --- TAB 5: DISTINCT PLOT TYPES (Line, Pie, Violin, Heatmap, Density) ---
+with tab5:
+    st.header("Distinct Visualization Techniques")
+    
+    c1, c2 = st.columns(2)
+    
+    # 1. Line Plot (Time Series)
+    with c1:
+        st.subheader("1. Time Series (Line Plot)")
+        # Resample by month
+        daily_counts = filtered_df.set_index('posting_date').resample('M').size().reset_index(name='count')
+        fig_line = px.line(daily_counts, x='posting_date', y='count', markers=True, 
+                           title="Monthly Job Posting Trend", labels={'count': 'Jobs Posted'})
+        st.plotly_chart(fig_line, use_container_width=True)
+        
+    # 2. Pie Chart (Composition)
+    with c2:
+        st.subheader("2. Composition (Pie Chart)")
+        fig_pie = px.pie(filtered_df, names='employment_type', title="Share of Employment Types", 
+                         hole=0.4, color_discrete_sequence=px.colors.sequential.RdBu)
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    c3, c4 = st.columns(2)
+
+    # 3. Violin Plot (Distribution Shape)
+    with c3:
+        st.subheader("3. Distribution Shape (Violin Plot)")
+        fig_violin = px.violin(filtered_df, x="experience_level", y="salary_usd", box=True, 
+                               title="Salary Density by Experience Level", color="experience_level")
+        st.plotly_chart(fig_violin, use_container_width=True)
+
+    # 4. Heatmap (Matrix View)
+    with c4:
+        st.subheader("4. Matrix View (Heatmap)")
+        # Pivot table
+        heatmap_data = filtered_df.pivot_table(index='industry', columns='experience_level', values='salary_usd', aggfunc='mean')
+        fig_heatmap = px.imshow(heatmap_data, text_auto=".2s", aspect="auto", color_continuous_scale="Viridis",
+                                title="Avg Salary Heatmap: Industry vs Experience")
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+
+    # 5. Density Contour (Hexbin alternative for Plotly)
+    st.subheader("5. Relationship Density (Contour Plot)")
+    fig_density = px.density_contour(filtered_df, x="years_experience", y="benefits_score", 
+                                     title="Density of Experience vs Benefits Score", 
+                                     marginal_x="histogram", marginal_y="histogram")
+    st.plotly_chart(fig_density, use_container_width=True)
+
+st.markdown("---")
+st.markdown("Dashboard generated via Streamlit • Created for Python Notebook users")
