@@ -258,10 +258,17 @@ Original file is located at
 
 
 
-from google.colab import files
 
-print("Please upload the 'ai_job_dataset copy.csv' file:")
-uploaded = files.upload()
+# Replace 'from google.colab import files' and 'files.upload()' with:
+uploaded_file = st.file_uploader("Upload the 'ai_job_dataset copy.csv' file", type=["csv"])
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    st.write("File uploaded successfully!")
+    # Your analysis code continues here using 'df'
+else:
+    st.info("Please upload the CSV file to proceed.")
+    st.stop() # Prevents the rest of the script from running without data
 
 # Install pyngrok to interact with ngrok
 
