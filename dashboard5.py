@@ -259,46 +259,30 @@ import pandas as pd
 
 
 
+import streamlit as st
+import pandas as pd
+import plotly.express as px
 
-# Replace 'from google.colab import files' and 'files.upload()' with:
-uploaded_file = st.file_uploader("Upload the 'ai_job_dataset copy.csv' file", type=["csv"])
+# --- APP CONFIGURATION ---
+st.set_page_config(page_title="AI Job Dashboard", layout="wide")
+
+# --- DATA LOADING ---
+st.title("🐍 AI Job Market Insights")
+
+# Use Streamlit's native file uploader instead of google.colab
+uploaded_file = st.file_uploader("Upload your 'ai_job_dataset copy.csv' file", type=["csv"])
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
-    st.write("File uploaded successfully!")
-    # Your analysis code continues here using 'df'
+    
+    # --- YOUR DASHBOARD LOGIC START ---
+    st.write("### Data Preview", df.head())
+    
+    # Example Chart
+    if 'job_title' in df.columns:
+        fig = px.bar(df['job_title'].value_counts().head(10), title="Top 10 Job Titles")
+        st.plotly_chart(fig)
+    # --- YOUR DASHBOARD LOGIC END ---
+    
 else:
-    st.info("Please upload the CSV file to proceed.")
-    st.stop() # Prevents the rest of the script from running without data
-
-# Install pyngrok to interact with ngrok
-
-
-"""#### Set your ngrok authentication token
-
-You can find your authtoken on your [ngrok dashboard](https://dashboard.ngrok.com/auth/your-authtoken).
-"""
-
-
-
-# Replace 'YOUR_NGROK_AUTH_TOKEN' with your actual ngrok authtoken
-NGROK_AUTH_TOKEN = "38qQ6lRDzZx5dnCIG7Wo4fIKACD_5VBvBiWWeNn2sj8nxbdV4"
-
-# Configure pyngrok with your authtoken
-conf.get_default().auth_token = NGROK_AUTH_TOKEN
-
-# Make sure the auth token is set
-if NGROK_AUTH_TOKEN == "YOUR_NGROK_AUTH_TOKEN":
-    print("WARNING: Please replace 'YOUR_NGROK_AUTH_TOKEN' with your actual ngrok authtoken.")
-else:
-    print("ngrok authtoken configured successfully.")
-
-"""#### Run Streamlit and expose it via ngrok"""
-
-import subprocess
-import os
-import time
-
-# Run Streamlit in the background
-# Streamlit usually runs on port 8501
-
+    st.info("Please upload a CSV file to see the dashboard.")
