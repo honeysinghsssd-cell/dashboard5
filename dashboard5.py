@@ -279,7 +279,7 @@ else:
 You can find your authtoken on your [ngrok dashboard](https://dashboard.ngrok.com/auth/your-authtoken).
 """
 
-from pyngrok import ngrok, conf
+
 
 # Replace 'YOUR_NGROK_AUTH_TOKEN' with your actual ngrok authtoken
 NGROK_AUTH_TOKEN = "38qQ6lRDzZx5dnCIG7Wo4fIKACD_5VBvBiWWeNn2sj8nxbdV4"
